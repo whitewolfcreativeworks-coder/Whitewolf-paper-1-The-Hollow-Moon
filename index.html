@@ -3051,21 +3051,24 @@ const LAB_FNS = {
   bowl() {
     mood("#17130F");
     bowlA.t.vis = 1;
-    camA.t.R = narrow ? 2.3 : 1.62; camA.t.el = .24; camA.t.y = .5; camA.t.x = 0; camA.t.az = 0;
+    camA.t.R = PHONE() ? 1.72 : narrow ? 2.3 : 1.62; camA.t.el = .24; camA.t.y = PHONE() ? .62 : .5; camA.t.x = 0; camA.t.az = 0;
     const m = HM.sharedCount(), W = HM.lab.bowl;
     const v = vennA.t; v.vis = 1; v.small = 1.38; v.y = 1.62; v.d = m === 0 ? 4.1 : 3.25 - m * .36; v.kernel = m > 0 ? 1 : 0;
     const Y = OW.position.y;
     const sc = lerp(1, .55, 1.38), cx = v.d / 2 * sc;
     if (!narrow) { C("oa", "Chef A's work", -cx - .35, v.y + .45, 0, "", W.a.length ? 1 : .6); C("ob", "Chef B's work", cx + .35, v.y + .45, 0, "", W.b.length ? 1 : .6); }
-    if (W.a.length || W.b.length) C("ok", m === 0 ? "no shared kernel" : m < 3 ? "a thin kernel" : "a shared kernel", 0, v.y - .05, .3, m === 0 ? "bad" : m < 3 ? "warn" : "gold", 1);
-    C("obl", "one bowl", 0, Y + .3, .55, "", 1);
+    if ((W.a.length || W.b.length) && !PHONE()) C("ok", m === 0 ? "no shared kernel" : m < 3 ? "a thin kernel" : "a shared kernel", 0, v.y - .05, .3, m === 0 ? "bad" : m < 3 ? "warn" : "gold", 1);
+    if (!PHONE()) C("obl", "one bowl", 0, Y + .3, .55, "", 1);
     HM.labStatus();
   },
   ships() {
     mood("#08131F");
     shipA.t.vis = 1;
-    camA.t.R = narrow ? 2.85 : 2.15; camA.t.el = .98; camA.t.y = -.6; camA.t.x = narrow ? 0 : -.05; camA.t.az = 0;
     const S = HM.lab.ships, T = HM.lab.SHIP_T, t = S.sailAt < 0 ? 0 : nowS() - S.sailAt, ph = HM.shipPhase(), Y = SW.position.y, forced = S.forcedAt >= 0;
+    // phones: come in close and travel with the ships (they lead, with the way ahead in view)
+    if (PHONE()) { camA.t.R = 2.05; camA.t.x = clamp(shipX(t) + 1.35, -1.6, 1.9); }
+    else { camA.t.R = narrow ? 2.85 : 2.15; camA.t.x = narrow ? 0 : -.05; }
+    camA.t.el = .98; camA.t.y = -.6; camA.t.az = 0;
     const dm = (i) => ph === "fog" && !forced ? (S.mode[i] === "hold" ? ": holding steady" : ": drifting") : "";
     for (let i = 0; i < 2; i++) C("sh" + i, PHONE() ? (i ? "B" : "A") : (i ? "Ship B" : "Ship A") + dm(i), shipX(t), Y + .55, shipZ(i) + (i ? .38 : -.38), PHONE() ? "sm" : "", 1);
     const banner = forced && (ph === "fog" || ph === "light") ? ["Forced agreement · on a guess", "big bad"]
