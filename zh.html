@@ -385,6 +385,8 @@ body.watch .hud { display: none; }
 .langmenu a small { opacity: .55; font-weight: 400; }
 .langmenu a[aria-current="true"] { background: rgba(255,255,255,.1); }
 .langmenu a:hover { background: rgba(255,255,255,.07); }
+.tapped { animation: tapPulse .9s ease-out; }
+@keyframes tapPulse { 0% { box-shadow: 0 0 0 0 rgba(255,214,140,.65); } 100% { box-shadow: 0 0 0 18px rgba(255,214,140,0); } }
 </style>
 </head>
 <body>
@@ -748,8 +750,27 @@ function stopPlay(keepSpeech) {
   if (typeof watchWake === "function") watchWake();
 }
 function stopAll() { stopPlay(); glide = null; }
+// a soft chime the moment Play is touched, so people know it heard them while the page gets ready (plain Web Audio: works before the music engine loads)
+let chimeCtx = null;
+window.__chime = () => chimeCtx ? chimeCtx.state : "none";
+function startChime() {
+  if (!soundOn) return;
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    if (!chimeCtx) chimeCtx = new AC();
+    if (chimeCtx.state === "suspended") chimeCtx.resume();
+    const t = chimeCtx.currentTime + .02, out = chimeCtx.createGain(); out.gain.value = .9; out.connect(chimeCtx.destination);
+    [[587.33, .07, 2.6], [587.33 * 2.4, .018, 1.2], [880, .035, 2.2]].forEach(([f, g, d], i) => {
+      const o = chimeCtx.createOscillator(), e = chimeCtx.createGain(), at = t + (i === 2 ? .16 : 0);
+      o.type = "sine"; o.frequency.value = f;
+      e.gain.setValueAtTime(0, at); e.gain.linearRampToValueAtTime(g, at + .012); e.gain.exponentialRampToValueAtTime(.0001, at + d);
+      o.connect(e); e.connect(out); o.start(at); o.stop(at + d + .05);
+    });
+  } catch (e) {}
+}
 playBtn.addEventListener("click", () => {
   if (playing) { stopAll(); return; }
+  if (!wantPlay) { startChime(); playBtn.classList.remove("tapped"); void playBtn.offsetWidth; playBtn.classList.add("tapped"); }
   if (hasRec && !player) { player = new Audio(); player.preload = "auto"; player.setAttribute("playsinline", ""); }
   unlockAudio();
   exitLab();
