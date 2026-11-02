@@ -1139,6 +1139,8 @@ selectTab("bell");
 setValue(0);
 let ownLoop = true;
 function loop(now) { if (ownLoop) { tickGlide(now); requestAnimationFrame(loop); } }
+// keeps Play moving when the page is in the background (another app, screen off): drawing stops there, so a timer carries the steps; only Pause stops it
+setInterval(() => { if (document.hidden && glide) tickGlide(performance.now()); }, 250);
 requestAnimationFrame(loop);
 
 return {
