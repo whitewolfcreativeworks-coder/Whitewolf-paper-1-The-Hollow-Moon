@@ -267,6 +267,7 @@ input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border-radius: 
 .fcard.signed .stamp { opacity: .9; }
 
 /* big lines spoken over the scene */
+#cine { will-change: opacity; } #cine .line { will-change: transform, filter; }
 #cine { position: fixed; left: 0; right: 0; display: grid; place-items: center; pointer-events: none; padding: 0 max(16px, env(safe-area-inset-left, 0px)); box-sizing: border-box; opacity: 0; }
 #cine .line { font-family: var(--display); font-weight: 500; font-size: clamp(26px, 4.6vw, 52px); line-height: 1.12; letter-spacing: -0.01em; text-align: center; text-wrap: balance;
   max-width: 27ch; text-shadow: 0 2px 24px rgba(0,0,0,.75), 0 0 40px rgba(13,26,43,.9); }
@@ -1471,10 +1472,12 @@ function updateCine(k, top, bottom) {
   }
   cineEl.style.opacity = cineA.toFixed(3);
   if (cineMist && !HM.reduceMotion) {
-    const m = 1 - cineA;
-    cineLine.style.filter = m > .01 ? `blur(${(m * 10).toFixed(1)}px)` : "";
-    cineLine.style.transform = `translateY(${(-m * 14).toFixed(1)}px) scale(${(1 + m * .04).toFixed(3)})`;
-    cineLine.style.letterSpacing = `${(m * .06).toFixed(3)}em`;
+    // eased so the mist is fully gone a little before full brightness, and the line stays on one drawing layer the whole time
+    // (switching the blur off at the end made the text "snap" into focus)
+    const m = 1 - cineA, e = m * m * (1.6 - .6 * m);
+    cineLine.style.filter = `blur(${(e * 10).toFixed(2)}px)`;
+    cineLine.style.transform = `translate3d(0, ${(-e * 14).toFixed(2)}px, 0) scale(${(1 + e * .04).toFixed(4)})`;
+    cineLine.style.letterSpacing = `${(e * .06).toFixed(4)}em`;
   } else if (cineLine.style.filter || cineLine.style.transform) { cineLine.style.filter = ""; cineLine.style.transform = ""; cineLine.style.letterSpacing = ""; }
   cineReq = null;
 }
