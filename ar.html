@@ -1424,7 +1424,7 @@ let chipReq = {};
 let chipSnap = false;
 // Only labels that show something the picture needs are kept (named things, lists you compare, the experiments).
 // Labels that only repeated the narration were taken out (Jason, Nov 1): they crowded small screens.
-const KEEP_CHIP = /^(?:as\d|rw\d|dc[123]|h[34]|nr\d|rq\d|v[12]|fb|fm|fx|kk\d|w[123]|ap\d|ia|ib|dl\d|dr\d|gl|hc\d|va|vb|ag[12]|ck\d|lb\d|lt_\w+|lsrc|lres|oa|ob|ok|obl|sh\d|sbanner|sfog|slh|sl4)$/;
+const KEEP_CHIP = /^(?:as\d|rw\d|dc[123]|nr\d|rq\d|v[12]|fb|fm|fx|kk\d|ap\d|ia|ib|dl\d|dr\d|gl|hc\d|va|vb|ag[12]|ck\d|lb\d|lt_\w+|lsrc|lres|oa|ob|ok|obl|sh\d|sbanner|sfog|slh|sl4)$/;
 function C(id, text, x, y, z = 0, cls = "", vis = 1) { if (!KEEP_CHIP.test(id)) return; chipReq[id] = { text, x, y, z, cls, vis }; }
 function updateChips(k) {
   for (const id in chipReq) {
