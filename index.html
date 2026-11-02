@@ -256,6 +256,7 @@ input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border-radius: 
 .chip.cool { border-color: rgba(143,211,244,.7); color: #D9F2FF; }
 .chip.strike { text-decoration: line-through; text-decoration-color: var(--fail); text-decoration-thickness: 2px; color: var(--muted); }
 .chip.big { font-size: 17px; padding: 9px 14px; }
+.capmore { display: none; }
 .tag.abc { font-size: 20px; font-family: var(--display); font-weight: 600; letter-spacing: 0; }
 .fcard { font-family: var(--display); color: var(--paper-ink); background: var(--paper); border-radius: 12px; padding: 16px 20px; width: min(78vw, 340px); box-sizing: border-box;
   box-shadow: 0 18px 50px rgba(0,0,0,.55); white-space: normal; text-align: left; position: relative; }
@@ -356,6 +357,24 @@ body.watch .hud { display: none; }
   .slider { gap: 2px 10px; }
   input[type=range] { height: 28px; }
   .wtc { font-size: 11px; }
+  /* Try it yourself on small screens: a short caption (More opens it), tabs in one row, compact controls */
+  .panel.inlab { gap: 6px; }
+  .labhead { gap: 6px 10px; }
+  .lab h2 { font-size: 19px; }
+  .lab { grid-template-columns: minmax(0, 1fr); }
+  .labhead > h2 { flex: 0 0 auto; }
+  .tabs { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; min-width: 0; max-width: 100%; flex: 1 1 100%; }
+  .tab { font-size: 11px; padding: 6px 8px; white-space: nowrap; flex: 0 0 auto; }
+  .status.cap { font-size: 13.5px; line-height: 1.4; }
+  .status.cap b { font-size: 15px; }
+  .status.cap:not(.open) { max-height: 2.85em; overflow: hidden; -webkit-mask-image: linear-gradient(#000 55%, transparent); mask-image: linear-gradient(#000 55%, transparent); }
+  .capmore { display: inline-block; justify-self: start; font: 700 12px/1 var(--body); color: var(--structure); background: none; border: 0; padding: 2px 0; margin-top: -4px; cursor: pointer; }
+  .ctl { gap: 5px; }
+  .ctl .row { gap: 4px; }
+  .ctl .who { flex: 0 0 auto !important; min-width: 0 !important; font-size: 11px; margin-right: 2px; }
+  .btn.ing, .btn.claim, .btn.part { padding: 5px 7px; font-size: 11px; }
+  .ctl > .btn { padding: 6px 9px; font-size: 11.5px; }
+  .chip.sm { font-size: 11px; padding: 3px 7px; border-radius: 8px; }
   .slider-labels span:nth-child(2) { display: none; }
 }
 @media (max-width: 600px) {
@@ -423,6 +442,7 @@ body.watch .hud { display: none; }
         </div>
       </div>
       <p class="status cap" id="labStatus" aria-live="polite"></p>
+      <button class="capmore" id="capMore" type="button" aria-expanded="false">More</button>
       <div class="ctl" data-for="bell">
         <button class="btn primary" type="button" id="ringBtn">Ring the bell</button>
         <button class="btn primary" type="button" id="traceBtn" disabled>Trace back</button>
@@ -810,6 +830,7 @@ function exitLab() {
   state.lab = false; panel.classList.remove("inlab"); labBtn.setAttribute("aria-pressed", "false"); labBtn.textContent = "Try it yourself";
 }
 labBtn.addEventListener("click", () => { if (state.lab) exitLab(); else enterLab(); });
+$("capMore").addEventListener("click", () => { const o = $("labStatus").classList.toggle("open"); $("capMore").textContent = o ? "Less" : "More"; $("capMore").setAttribute("aria-expanded", o ? "true" : "false"); });
 
 // ---------- Watch: the film alone, full screen, no panel. A small bar appears when you touch the screen. ----------
 const watchBar = $("watchBar"); let watchIdle = null, watchFS = false;
@@ -2974,6 +2995,7 @@ function drawShips() {
 function drawLabs() { labDots.begin(); drawBell(); drawBowl(); drawShips(); labDots.end(); }
 allDots.push(labDots);
 
+const PHONE = () => W < 600 || H < 500;   // small phones only (the iPad keeps its full labels)
 const LAB_FNS = {
   bell() {
     mood("#0A1424");
@@ -2988,7 +3010,7 @@ const LAB_FNS = {
       for (const p of ["signal", "structure", "echo"]) {
         if (M[p]) continue;
         const a = TAG_AT[p], r = shapeRho(a, WAVE_HELD, M.structure) + LAYER[p];
-        C("lt_" + p, F[p] ? nm[p] : "? tap me", Math.cos(a) * r, CY + Math.sin(a) * r, 0, cls[p], 1);
+        C("lt_" + p, F[p] ? nm[p] : "? tap me", Math.cos(a) * r, CY + Math.sin(a) * r, 0, cls[p] + (PHONE() ? " sm" : ""), 1);
       }
       if (F.echo && !M.echo) C("lsrc", "it began here", 0, CY - .32, 0, "echo", smooth(.8, 1.4, nowS() - F.echo));
     }
@@ -3015,18 +3037,18 @@ const LAB_FNS = {
   ships() {
     mood("#08131F");
     shipA.t.vis = 1;
-    camA.t.R = narrow ? 2.95 : 2.15; camA.t.el = .98; camA.t.y = -.6; camA.t.x = narrow ? 0 : -.05; camA.t.az = 0;
+    camA.t.R = PHONE() ? 3.4 : narrow ? 2.95 : 2.15; camA.t.el = .98; camA.t.y = -.6; camA.t.x = narrow ? 0 : -.05; camA.t.az = 0;
     const S = HM.lab.ships, T = HM.lab.SHIP_T, t = S.sailAt < 0 ? 0 : nowS() - S.sailAt, ph = HM.shipPhase(), Y = SW.position.y, forced = S.forcedAt >= 0;
     const dm = (i) => ph === "fog" && !forced ? (S.mode[i] === "hold" ? ": holding steady" : ": drifting") : "";
-    for (let i = 0; i < 2; i++) C("sh" + i, (i ? "Ship B" : "Ship A") + dm(i), shipX(t), Y + .55, shipZ(i) + (i ? .38 : -.38), "", 1);
+    for (let i = 0; i < 2; i++) C("sh" + i, PHONE() ? (i ? "B" : "A") : (i ? "Ship B" : "Ship A") + dm(i), shipX(t), Y + .55, shipZ(i) + (i ? .38 : -.38), PHONE() ? "sm" : "", 1);
     const banner = forced && (ph === "fog" || ph === "light") ? ["Forced agreement · on a guess", "big bad"]
       : ph === "fog" ? ["Local coherence · each ship on its own", "big cool"]
       : ph === "light" || ph === "home" ? ["Global coherence again · one shared signal", forced ? "big warn" : "big gold"]
       : ["Global coherence · in sight of each other", "big ok"];
-    C("sbanner", banner[0], -.3, Y + .25, -1.75, banner[1], 1);
-    C("sfog", "fog", (FOG_X[0] + FOG_X[1]) / 2, Y + .6, 1.2, "", ph === "idle" || ph === "harbor" ? 1 : 0);
-    C("slh", "the lighthouse", LH.x, Y + 1.15, LH.z, "gold", 1);
-    if (ph === "home") C("sl4", forced ? "both had to correct" : "lined up again: consensus", shipX(t) - .2, Y + .3, 0, forced ? "warn" : "ok", 1);
+    if (!PHONE()) { C("sbanner", banner[0], -.3, Y + .25, -1.75, banner[1], 1);
+    C("sfog", "fog", (FOG_X[0] + FOG_X[1]) / 2, Y + .6, 1.2, "", ph === "idle" || ph === "harbor" ? 1 : 0); }
+    if (!PHONE()) C("slh", "the lighthouse", LH.x, Y + 1.15, LH.z, "gold", 1);
+    if (ph === "home" && !PHONE()) C("sl4", forced ? "both had to correct" : "lined up again: consensus", shipX(t) - .2, Y + .3, 0, forced ? "warn" : "ok", 1);
     once("sl" + S.sailAt, S.sailAt >= 0 && t >= T.light, "bell2"); once("sa" + S.sailAt, S.sailAt >= 0 && t >= T.aligned, forced ? "break" : "resolve");
     HM.labStatus();
   }
@@ -3475,7 +3497,7 @@ canvas.addEventListener("pointerdown", (e) => {
   toNdc(e); ray.setFromCamera(ndc, camera);
   if (!ray.ray.intersectPlane(bellPlane, hitP)) return;
   const Bs = HM.lab.bell, a = Math.atan2(hitP.y - CY, hitP.x), r = Math.hypot(hitP.x, hitP.y - CY);
-  let best = null, bd = .3;
+  let best = null, bd = narrow ? .55 : .3;   // phones: a tap near a layer counts
   for (const p of ["signal", "structure", "echo"]) { if (Bs.mute[p]) continue; const dd = Math.abs(r - (shapeRho(a, WAVE_HELD, Bs.mute.structure) + LAYER[p])); if (dd < bd) { bd = dd; best = p; } }
   if (best) HM.identifyPart(best); else HM.cue("tick");
 });
