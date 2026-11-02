@@ -759,15 +759,40 @@ function startChime() {
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
     if (!chimeCtx) chimeCtx = new AC();
     if (chimeCtx.state === "suspended") chimeCtx.resume();
-    const t = chimeCtx.currentTime + .02, out = chimeCtx.createGain(); out.gain.value = .9; out.connect(chimeCtx.destination);
-    [[587.33, .07, 2.6], [587.33 * 2.4, .018, 1.2], [880, .035, 2.2]].forEach(([f, g, d], i) => {
-      const o = chimeCtx.createOscillator(), e = chimeCtx.createGain(), at = t + (i === 2 ? .16 : 0);
-      o.type = "sine"; o.frequency.value = f;
-      e.gain.setValueAtTime(0, at); e.gain.linearRampToValueAtTime(g, at + .012); e.gain.exponentialRampToValueAtTime(.0001, at + d);
-      o.connect(e); e.connect(out); o.start(at); o.stop(at + d + .05);
-    });
+    templeBell(chimeCtx, chimeCtx.currentTime + .03, chimeCtx.destination);
   } catch (e) {}
 }
+// a large temple bowl struck once: deep D with bowl overtones that beat slowly, a soft mallet,
+// a warm hall and a long echo that carries through the loading pause (~9 s)
+function templeBell(ctx, t, dest) {
+  const out = ctx.createDynamicsCompressor(); out.threshold.value = -14; out.ratio.value = 4; out.attack.value = .003; out.release.value = .4;
+  const master = ctx.createGain(); master.gain.value = .9; out.connect(master); master.connect(dest);
+  // hall: a synthetic decaying-noise impulse
+  const len = Math.floor(ctx.sampleRate * 4.5), ir = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let ch = 0; ch < 2; ch++) { const d = ir.getChannelData(ch); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2); }
+  const hall = ctx.createConvolver(); hall.buffer = ir; const hallG = ctx.createGain(); hallG.gain.value = .32; hall.connect(hallG); hallG.connect(out);
+  // echo: a dark feedback delay, each repeat softer and warmer
+  const dl = ctx.createDelay(2); dl.delayTime.value = .42; const fb = ctx.createGain(); fb.gain.value = .42; const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 1800;
+  dl.connect(lp); lp.connect(fb); fb.connect(dl); const echoG = ctx.createGain(); echoG.gain.value = .5; lp.connect(echoG); echoG.connect(out); echoG.connect(hall);
+  const dry = ctx.createGain(); dry.gain.value = 1; dry.connect(out); dry.connect(hall); dry.connect(dl);
+  const f0 = 146.83;  // D3, the home note of the closing chord
+  // [ratio, gain, decay s, beat Hz]
+  [[1, .26, 9, .7], [2.01, .12, 7, 1.1], [2.76, .16, 7.5, .9], [4.1, .07, 5, 1.6], [5.43, .06, 4.2, 2.1], [8.9, .025, 2.6, 0]].forEach(([r, g, d, beat]) => {
+    [0, beat].forEach((off, k) => {
+      if (k && !off) return;
+      const o = ctx.createOscillator(), e = ctx.createGain(); o.type = "sine"; o.frequency.value = f0 * r + off;
+      const gg = k ? g * .55 : g;
+      e.gain.setValueAtTime(0, t); e.gain.linearRampToValueAtTime(gg, t + .018); e.gain.exponentialRampToValueAtTime(gg * .35, t + d * .25); e.gain.exponentialRampToValueAtTime(.0001, t + d);
+      o.connect(e); e.connect(dry); o.start(t); o.stop(t + d + .1);
+    });
+  });
+  // the mallet: a short soft thump
+  const nb = ctx.createBuffer(1, Math.floor(ctx.sampleRate * .08), ctx.sampleRate), nd = nb.getChannelData(0);
+  for (let i = 0; i < nd.length; i++) nd[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / nd.length, 2);
+  const ns = ctx.createBufferSource(); ns.buffer = nb; const nf = ctx.createBiquadFilter(); nf.type = "lowpass"; nf.frequency.value = 700; const ng = ctx.createGain(); ng.gain.value = .35;
+  ns.connect(nf); nf.connect(ng); ng.connect(dry); ns.start(t);
+}
+window.__templeBell = templeBell;
 playBtn.addEventListener("click", () => {
   if (playing) { stopAll(); return; }
   if (!wantPlay) { startChime(); playBtn.classList.remove("tapped"); void playBtn.offsetWidth; playBtn.classList.add("tapped"); }
