@@ -602,7 +602,7 @@ function setValue(v) {
     [...dots.children].forEach((d, j) => d.classList.toggle("on", j <= state.step));
   }
 }
-range.addEventListener("input", () => { stopAll(); exitLab(); setValue(+range.value); });
+range.addEventListener("input", () => { stopAll(); exitLab(); hushSound(); setValue(+range.value); });   // sliding is silent; sound comes back with Play or Next
 
 // ---------- glide (Next / Play) ----------
 let glide = null;
@@ -616,7 +616,7 @@ function tickGlide(now) {
   if (t >= 1 && g === glide) { glide = null; g.done && g.done(); }
 }
 nextBtn.addEventListener("click", () => {
-  stopPlay(); exitLab(); unlockAudio();
+  stopPlay(); exitLab(); unlockAudio(); wakeSound();
   if (state.value >= MAXV) return;
   glideTo((Math.floor(state.value / PER + 1e-6) + 1) * PER, 3200);
 });
@@ -734,6 +734,7 @@ function finishPlay() {
   else say(C.closing, () => { if (!ending) return; ending = false; enterLab("bell"); }, "end");
 }
 function startPlay() {
+  wakeSound();
   if (state.value >= MAXV - 1e-6) setValue(0);
   setValue(stepAt() * PER);
   playing = true; playBtn.setAttribute("aria-pressed", "true"); playBtn.setAttribute("aria-label", "Pause");
@@ -817,6 +818,7 @@ const lab = {
   SHIP_T, BELL_T, ING
 };
 function enterLab(tab) {
+  wakeSound();
   if (document.body.classList.contains("watch")) exitWatch();
   stopAll();
   state.lab = true; panel.classList.add("inlab"); labBtn.setAttribute("aria-pressed", "true"); labBtn.textContent = "Back to the film";
@@ -1017,6 +1019,24 @@ function labStatus() {
 
 // ---------- the score: singing bowls and soft bells (Tone.js, generated in the browser) ----------
 let soundOn = true, tone = null, toneLoading = false, ducked = false;
+// Sliding the slider is silent: ringing bowls and their echo fade out at once, no new strikes sound,
+// and the score comes back when the viewer presses Play (or Next, or opens the experiments).
+let quiet = false; const voices = new Set();
+function hushSound() {
+  quiet = true;
+  if (!tone || !music.hush) return;
+  try {
+    const t = tone.now();
+    music.hush.gain.cancelScheduledValues(t); music.hush.gain.rampTo(0, .12);
+    voices.forEach((v) => { try { v.env.gain.cancelScheduledValues(t); v.env.gain.setValueAtTime(v.env.gain.value, t); v.env.gain.linearRampToValueAtTime(0, t + .08); v.a.stop(t + .1); v.b.stop(t + .1); } catch (e) {} });
+    voices.clear();
+  } catch (e) {}
+}
+window.__snd = () => ({ quiet, voices: voices.size, hush: music.hush ? +music.hush.gain.value.toFixed(3) : null });
+function wakeSound() {
+  if (!quiet) return; quiet = false;
+  if (tone && music.hush) { try { music.hush.gain.cancelScheduledValues(tone.now()); music.hush.gain.rampTo(1, 1.2); } catch (e) {} }
+}
 const music = {};
 soundBtn.addEventListener("click", () => {
   soundOn = !soundOn;
@@ -1048,7 +1068,8 @@ function unlockAudio(preload) {
       music.comp = new tone.Compressor({ threshold: -20, ratio: 2.5, attack: .02, release: .3, knee: 12 }).connect(music.limit);
       music.out = new tone.Gain(soundOn ? 1 : 0).connect(music.comp);
       music.mix = new tone.Gain(ducked ? .5 : 1).connect(music.out);
-      music.verb = new tone.Reverb({ decay: 9, wet: .5 }).connect(music.mix);
+      music.hush = new tone.Gain(quiet ? 0 : 1).connect(music.mix);
+      music.verb = new tone.Reverb({ decay: 9, wet: .5 }).connect(music.hush);
       music.bus = new tone.Gain(.63).connect(music.verb);
       // a quiet drone: low partials that slowly breathe, like a large bowl still humming
       music.droneGain = new tone.Gain(0).connect(music.verb);
@@ -1078,13 +1099,14 @@ function bowl(f, o = {}) {
     const d = o.damped ? Math.min(dur, 1.4) : dur / (1 + i * .55);
     env.gain.setValueAtTime(0, now); env.gain.linearRampToValueAtTime(amp, now + att); env.gain.exponentialRampToValueAtTime(.0001, now + att + d);
     a.start(now); b.start(now); a.stop(now + att + d + .1); b.stop(now + att + d + .1);
-    setTimeout(() => { try { a.dispose(); b.dispose(); env.dispose(); } catch (e) {} }, (att + d + 1.5 + (o.delay || 0)) * 1000);
+    const v = { a, b, env }; voices.add(v);
+    setTimeout(() => { voices.delete(v); try { a.dispose(); b.dispose(); env.dispose(); } catch (e) {} }, (att + d + 1.5 + (o.delay || 0)) * 1000);
   });
 }
 const PITCH = { moon: 146.83, str: 293.66, sig: 220, ech: 369.99 };
 const earlyCues = [];
 function cue(name) {
-  if (!soundOn) return;
+  if (!soundOn || quiet) return;
   if (!tone) { if (earlyCues.length < 4) earlyCues.push({ name, at: performance.now() }); return; }
   try {
     switch (name) {
