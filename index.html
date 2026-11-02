@@ -1027,6 +1027,11 @@ soundBtn.addEventListener("click", () => {
 });
 function duck(on) { ducked = on; if (tone && music.mix) music.mix.gain.rampTo(on ? .5 : 1, .8); }
 let toneWanted = false;
+try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch (e) {}
+["pointerdown", "touchend", "click"].forEach((ev) => document.addEventListener(ev, () => {
+  if (!tone || !soundOn) return;
+  try { if (tone.context.state !== "running") tone.start(); } catch (e) {}
+}, { capture: true, passive: true }));
 function unlockAudio(preload) {
   if (!preload && soundOn) toneWanted = true;
   if (!soundOn && !preload) return;
@@ -3037,7 +3042,7 @@ const LAB_FNS = {
   ships() {
     mood("#08131F");
     shipA.t.vis = 1;
-    camA.t.R = PHONE() ? 3.4 : narrow ? 2.95 : 2.15; camA.t.el = .98; camA.t.y = -.6; camA.t.x = narrow ? 0 : -.05; camA.t.az = 0;
+    camA.t.R = narrow ? 2.85 : 2.15; camA.t.el = .98; camA.t.y = -.6; camA.t.x = narrow ? 0 : -.05; camA.t.az = 0;
     const S = HM.lab.ships, T = HM.lab.SHIP_T, t = S.sailAt < 0 ? 0 : nowS() - S.sailAt, ph = HM.shipPhase(), Y = SW.position.y, forced = S.forcedAt >= 0;
     const dm = (i) => ph === "fog" && !forced ? (S.mode[i] === "hold" ? ": holding steady" : ": drifting") : "";
     for (let i = 0; i < 2; i++) C("sh" + i, PHONE() ? (i ? "B" : "A") : (i ? "Ship B" : "Ship A") + dm(i), shipX(t), Y + .55, shipZ(i) + (i ? .38 : -.38), PHONE() ? "sm" : "", 1);
@@ -3493,6 +3498,12 @@ const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), hitP = new THREE.V
 const bellPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
 function toNdc(e) { ndc.set((e.clientX / W) * 2 - 1, -(e.clientY / H) * 2 + 1); }
 canvas.addEventListener("pointerdown", (e) => {
+  if (st.lab && HM.lab.tab === "bell" && (HM.bellPhase() === "idle" || HM.bellPhase() === "traced")) {
+    // the bell itself is a button: touch it to ring it
+    toNdc(e); ray.setFromCamera(ndc, camera);
+    if (ray.ray.intersectPlane(bellPlane, hitP) && Math.hypot(hitP.x, hitP.y - CY) < 1.05) document.getElementById("ringBtn").click();
+    return;
+  }
   if (!st.lab || HM.lab.tab !== "bell" || HM.bellPhase() !== "held") return;
   toNdc(e); ray.setFromCamera(ndc, camera);
   if (!ray.ray.intersectPlane(bellPlane, hitP)) return;
