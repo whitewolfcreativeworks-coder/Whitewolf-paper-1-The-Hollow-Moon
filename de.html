@@ -1096,6 +1096,34 @@ soundBtn.addEventListener("click", () => {
   if (soundOn) unlockAudio();
   if (tone && music.out) music.out.gain.rampTo(soundOn ? 1 : 0, .5);
 });
+// ---------- sleep timer: the sound never runs forever ----------
+// After the explainer ends (or is paused, or left alone, even in the background), the drone and bowls keep the mood
+// for SLEEP_AFTER, then fade out slowly over SLEEP_FADE and the audio engine is suspended to save the battery.
+// Any touch, key or Play wakes it again. Playing or speaking counts as activity, so it never cuts off the explainer.
+const SLEEP_AFTER = 5 * 60 * 1000, SLEEP_FADE = 25;
+let lastActive = performance.now(), soundAsleep = false, sleepTimer = null;
+function sleepSound() {
+  if (soundAsleep) return; soundAsleep = true;
+  try { if (tone && music.sleepG) { const t = tone.now(); music.sleepG.gain.cancelScheduledValues(t); music.sleepG.gain.setValueAtTime(music.sleepG.gain.value, t); music.sleepG.gain.linearRampToValueAtTime(0, t + SLEEP_FADE); } } catch (e) {}
+  clearTimeout(sleepTimer);
+  sleepTimer = setTimeout(() => {
+    if (!soundAsleep) return;
+    try { if (tone) tone.getContext().rawContext.suspend(); } catch (e) {}
+    try { if (chimeCtx && chimeCtx.state === "running") chimeCtx.suspend(); } catch (e) {}
+  }, (SLEEP_FADE + 1) * 1000);
+}
+function wakeFromSleep() {
+  lastActive = performance.now();
+  if (!soundAsleep) return; soundAsleep = false; clearTimeout(sleepTimer);
+  try { if (tone) { if (tone.context.state !== "running") tone.start(); const t = tone.now(); music.sleepG.gain.cancelScheduledValues(t); music.sleepG.gain.setValueAtTime(music.sleepG.gain.value, t); music.sleepG.gain.linearRampToValueAtTime(1, t + 2.5); } } catch (e) {}
+}
+["pointerdown", "touchstart", "keydown"].forEach((ev) => document.addEventListener(ev, wakeFromSleep, { capture: true, passive: true }));
+setInterval(() => {
+  const busy = playing || ending || wantPlay || (player && !player.paused) || (synth && synth.speaking);
+  if (busy) { lastActive = performance.now(); if (soundAsleep) wakeFromSleep(); return; }
+  if (!soundAsleep && tone && performance.now() - lastActive > SLEEP_AFTER) sleepSound();
+}, 5000);
+window.__sleep = (ms) => { if (ms != null) lastActive = performance.now() - ms; return { asleep: soundAsleep, idle: Math.round(performance.now() - lastActive), ctx: tone ? tone.context.state : "none" }; };
 function duck(on) { ducked = on; if (tone && music.mix) music.mix.gain.rampTo(on ? .5 : 1, .8); }
 let toneWanted = false;
 try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch (e) {}
@@ -1117,7 +1145,8 @@ function unlockAudio(preload) {
       // master: a gentle glue compressor and a safety limiter, so bell strikes never spike or crackle on small speakers
       music.limit = new tone.Limiter(-2).toDestination();
       music.comp = new tone.Compressor({ threshold: -20, ratio: 2.5, attack: .02, release: .3, knee: 12 }).connect(music.limit);
-      music.out = new tone.Gain(soundOn ? 1 : 0).connect(music.comp);
+      music.sleepG = new tone.Gain(soundAsleep ? 0 : 1).connect(music.comp);   // the sleep timer's own fader
+      music.out = new tone.Gain(soundOn ? 1 : 0).connect(music.sleepG);
       music.mix = new tone.Gain(ducked ? .5 : 1).connect(music.out);
       music.hush = new tone.Gain(quiet ? 0 : 1).connect(music.mix);
       music.verb = new tone.Reverb({ decay: 9, wet: .5 }).connect(music.hush);
